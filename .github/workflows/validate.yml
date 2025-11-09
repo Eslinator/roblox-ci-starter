@@ -1,0 +1,45 @@
+name: Validate
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+permissions:
+  contents: read
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.2.2 pinned
+      - name: Check required secrets
+        env:
+          API: ${{ secrets.ROBLOX_API_KEY }}
+          UNIV: ${{ secrets.ROBLOX_UNIVERSE_ID }}
+          PLACE: ${{ secrets.ROBLOX_PLACE_ID }}
+        run: |
+          set -euo pipefail
+          [ -n "$API" ] && [ -n "$UNIV" ] && [ -n "$PLACE" ] || { echo "Missing required secrets"; exit 1; }
+          [[ "$UNIV" =~ ^[0-9]+$ ]] || { echo "UNIVERSE_ID must be numeric"; exit 1; }
+          [[ "$PLACE" =~ ^[0-9]+$ ]] || { echo "PLACE_ID must be numeric"; exit 1; }
+      - name: Emit inputs.json
+        env:
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
+          UNIV: ${{ secrets.ROBLOX_UNIVERSE_ID }}
+          PLACE: ${{ secrets.ROBLOX_PLACE_ID }}
+        run: |
+          cat > inputs.json <<JSON
+          {
+            "repo_url": "${REPO_URL}",
+            "universe_id": ${UNIV},
+            "place_id": ${PLACE},
+            "roblox_api_key_location": "GitHubSecret",
+            "action_auth_key_location": "GPT-Action-API-Key",
+            "runtime": "GitHubActions",
+            "scope": "Week1",
+            "subsystem": "ServerAuthority",
+            "validation_level": "basic"
+          }
+          JSON
+          cat inputs.json

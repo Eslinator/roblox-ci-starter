@@ -1,0 +1,5 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Hello = require(ReplicatedStorage:WaitForChild("HelloModule"))
+game.Players.PlayerAdded:Connect(function(player)
+  print(Hello.greet(player))
+end)
