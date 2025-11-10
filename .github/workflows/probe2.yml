@@ -6,9 +6,6 @@ on:
         description: "why"
         required: false
         default: "manual"
-  push:
-    paths:
-      - ".github/workflows/probe2.yml"
 
 permissions:
   contents: read
