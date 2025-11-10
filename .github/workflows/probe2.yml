@@ -1,0 +1,62 @@
+name: Probe-Roblox-v2
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "why"
+        required: false
+        default: "manual"
+  push:
+    paths:
+      - ".github/workflows/probe2.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
+      - name: Verify required secrets
+        env:
+          API:   ${{ secrets.ROBLOX_API_KEY }}
+          PLACE: ${{ secrets.ROBLOX_PLACE_ID }}
+        run: |
+          set -euo pipefail
+          [ -n "${API:-}" ] && [ -n "${PLACE:-}" ] || { echo "Missing API/PLACE secret(s)"; exit 1; }
+          [[ "$PLACE" =~ ^[0-9]+$ ]] || { echo "PLACE_ID must be numeric"; exit 1; }
+
+      - name: Public: resolve universe + creator info (no auth)
+        id: pub
+        env:
+          PLACE: ${{ secrets.ROBLOX_PLACE_ID }}
+        run: |
+          set -euo pipefail
+          curl -fsS "https://apis.roblox.com/universes/v1/places/${PLACE}/universe" | tee uni.json
+          UNIV=$(jq -r .universeId uni.json)
+          echo "universe=$UNIV" >> "$GITHUB_OUTPUT"
+          curl -fsS "https://games.roblox.com/v1/games?universeIds=${UNIV}" | tee games.json
+          jq -r '.data[0] | {id, name, creatorName:.creator.name, creatorType:.creator.type, creatorId:.creator.id}'
+
+      - name: Auth: GET universe meta
+        env:
+          API:  ${{ secrets.ROBLOX_API_KEY }}
+          UNIV: ${{ steps.pub.outputs.universe }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o u.json -w "%{http_code}" -H "x-api-key: $API" "https://apis.roblox.com/universes/v1/universes/${UNIV}")
+          echo "GET /universes/${UNIV} -> HTTP $code"
+          cat u.json || true
+
+      - name: Auth: list places in universe
+        env:
+          API:  ${{ secrets.ROBLOX_API_KEY }}
+          UNIV: ${{ steps.pub.outputs.universe }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o resp.json -w "%{http_code}" -H "x-api-key: $API" "https://apis.roblox.com/universes/v1/universes/${UNIV}/places")
+          echo "GET /universes/${UNIV}/places -> HTTP ${code}"
+          cat resp.json || true
+          [ "$code" = "200" ] || { echo "::error::Expected 200, got ${code}"; exit 1; }
