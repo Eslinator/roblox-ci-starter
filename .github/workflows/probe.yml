@@ -9,18 +9,26 @@ jobs:
       - name: Verify secrets present
         env:
           API:   ${{ secrets.ROBLOX_API_KEY }}
-          UNIV:  ${{ secrets.ROBLOX_UNIVERSE_ID }}
           PLACE: ${{ secrets.ROBLOX_PLACE_ID }}
         run: |
           set -euo pipefail
-          [ -n "$API" ] && [ -n "$UNIV" ] && [ -n "$PLACE" ] || { echo "Missing secrets"; exit 1; }
-          [[ "$UNIV" =~ ^[0-9]+$ ]] && [[ "$PLACE" =~ ^[0-9]+$ ]] || { echo "IDs must be numeric"; exit 1; }
-      - name: List places in universe (read-only)
+          [ -n "$API" ] && [ -n "$PLACE" ] || { echo "Missing API/PLACE secret(s)"; exit 1; }
+          [[ "$PLACE" =~ ^[0-9]+$ ]] || { echo "PLACE_ID must be numeric"; exit 1; }
+      - name: Discover universe by place (public)
+        id: discover
         env:
-          API:  ${{ secrets.ROBLOX_API_KEY }}
-          UNIV: ${{ secrets.ROBLOX_UNIVERSE_ID }}
+          PLACE: ${{ secrets.ROBLOX_PLACE_ID }}
         run: |
           set -euo pipefail
+          curl -fsS "https://apis.roblox.com/universes/v1/places/${PLACE}/universe" | tee uni.json
+          UNIV=$(jq -r .universeId uni.json)
+          echo "univ=$UNIV" >> "$GITHUB_OUTPUT"
+      - name: List places in universe (auth)
+        env:
+          API:  ${{ secrets.ROBLOX_API_KEY }}
+        run: |
+          set -euo pipefail
+          UNIV="${{ steps.discover.outputs.univ }}"
           code=$(curl -sS -o resp.json -w "%{http_code}" \
             -H "x-api-key: $API" \
             "https://apis.roblox.com/universes/v1/universes/${UNIV}/places")
