@@ -1,0 +1,22 @@
+name: roblox-public-sancheck
+on:
+  workflow_dispatch:
+
+jobs:
+  t0:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Resolve UNIV (public)
+        env:
+          PLACE: ${{ secrets.ROBLOX_PLACE_ID }}
+        run: |
+          set -euo pipefail
+          curl -fsS "https://apis.roblox.com/universes/v1/places/${PLACE}/universe" | tee uni.json
+          jq -r '. | {universeId}' uni.json
+
+      - name: Show creator (public)
+        run: |
+          set -euo pipefail
+          UNIV=$(jq -r .universeId uni.json)
+          curl -fsS "https://games.roblox.com/v1/games?universeIds=${UNIV}" \
+            | jq -r '.data[0] | {name, rootPlaceId, creatorName: .creator.name, creatorType: .creator.type, creatorId: .creator.id}'
