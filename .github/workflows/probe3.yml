@@ -1,8 +1,42 @@
 name: probe3
 on:
   workflow_dispatch:
+
 jobs:
   t0:
     runs-on: ubuntu-24.04
     steps:
-      - run: echo "probe3 boot"
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+
+      - name: Public: resolve universe by PLACE
+        env:
+          PLACE: ${{ secrets.ROBLOX_PLACE_ID }}
+        run: |
+          set -euo pipefail
+          echo "PLACE=$PLACE"
+          curl -fsS "https://apis.roblox.com/universes/v1/places/${PLACE}/universe" | tee uni.json
+          jq -r '. | {universeId}' uni.json
+          UNIV=$(jq -r .universeId uni.json)
+          echo "UNIV=$UNIV"
+
+      - name: Auth: GET universe meta
+        env:
+          API:  ${{ secrets.ROBLOX_API_KEY }}
+        run: |
+          set -euo pipefail
+          UNIV=$(jq -r .universeId uni.json)
+          code=$(curl -sS -o u.json -w "%{http_code}" -H "x-api-key: $API" \
+                 "https://apis.roblox.com/universes/v1/universes/${UNIV}")
+          echo "GET /universes/${UNIV} -> HTTP $code"
+          cat u.json || true
+
+      - name: Auth: list places in universe
+        env:
+          API:  ${{ secrets.ROBLOX_API_KEY }}
+        run: |
+          set -euo pipefail
+          UNIV=$(jq -r .universeId uni.json)
+          code=$(curl -sS -o resp.json -w "%{http_code}" -H "x-api-key: $API" \
+                 "https://apis.roblox.com/universes/v1/universes/${UNIV}/places")
+          echo "GET /universes/${UNIV}/places -> HTTP ${code}"
+          cat resp.json || true
