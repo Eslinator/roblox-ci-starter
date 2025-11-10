@@ -1,12 +1,11 @@
 name: Probe-Roblox
-on:
-  workflow_dispatch: {}
+on: { workflow_dispatch: {} }
 permissions: { contents: read }
 jobs:
   probe:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.2.2
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
       - name: Verify secrets present
         env:
           API:   ${{ secrets.ROBLOX_API_KEY }}
@@ -22,5 +21,9 @@ jobs:
           UNIV: ${{ secrets.ROBLOX_UNIVERSE_ID }}
         run: |
           set -euo pipefail
-          curl -fsS -H "x-api-key: $API" \
-            "https://apis.roblox.com/universes/v1/universes/${UNIV}/places" | jq .
+          code=$(curl -sS -o resp.json -w "%{http_code}" \
+            -H "x-api-key: $API" \
+            "https://apis.roblox.com/universes/v1/universes/${UNIV}/places")
+          echo "HTTP ${code}"
+          cat resp.json || true
+          [ "$code" = "200" ]
